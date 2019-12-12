@@ -1,4 +1,6 @@
-﻿using assignment_api.Models;
+﻿using assignment_api.Logging;
+using assignment_api.Models;
+using assignment_api.Validation;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -10,23 +12,46 @@ namespace assignment_api
 {
     public class DB
     {
+        DataTable dtHistoryData = new DataTable();
+        static string connString = AppKeyVaidation.ValidateAppKey("DBConnectionString", "connectionStrings");
+
         /// <summary>
         /// This DB method return the table to History Data.
         /// </summary>
         /// <param name="StrErrMsg"></param>
         /// <returns></returns>
-        public DataTable GetHistory(ref string StrErrMsg)
+        public DataTable GetHistory(ref string StrErrMsg,Filter _Filter)
         {
-            DataTable dtHistoryData = new DataTable();
             try
             {
-                SqlConnection conn = new SqlConnection(System.Configuration.ConfigurationManager.ConnectionStrings["DBConnectionString"].ConnectionString);
-                conn.Open();
-
-                string query = "SELECT Input_String,Size,Output FROM T_http_history";
-
-                SqlCommand cmd = new SqlCommand(query, conn);
-                dtHistoryData.Load(cmd.ExecuteReader());
+                string query = string.Empty;
+                using (SqlConnection conn = new SqlConnection(connString))
+                {
+                    if(conn.State!= ConnectionState.Open)
+                    {
+                        conn.Open();
+                    }
+                    if ((_Filter.Status == null || _Filter.Status == "") && (_Filter.Date == null || _Filter.Date == ""))
+                    {
+                        query = "SELECT Input_String,Size,Output FROM T_http_history";
+                    }
+                    if ((_Filter.Status != null || _Filter.Status != "") && (_Filter.Date == null || _Filter.Date == ""))
+                    {
+                        query = "SELECT Input_String,Size,Output FROM T_http_history Where Output '%" + _Filter.Status + "+%'";
+                    }
+                    if ((_Filter.Status == null || _Filter.Status == "") && (_Filter.Date != null || _Filter.Date != ""))
+                    {
+                        query = "SELECT Input_String,Size,Output FROM T_http_history Where CAST(EntryDateTime As Date) ='" + _Filter.Date + "'";
+                    }
+                    if ((_Filter.Status != null || _Filter.Status != "") && (_Filter.Date != null || _Filter.Date != ""))
+                    {
+                        query = "SELECT Input_String,Size,Output FROM T_http_history Where  Output '%" + _Filter.Status + "+%' AND CAST(EntryDateTime As Date) ='" + _Filter.Date + "'";
+                    }
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    dtHistoryData.Load(cmd.ExecuteReader());
+                    conn.Close();
+                    conn.Dispose();
+                }
             }
             catch (Exception ex)
             {
@@ -46,13 +71,19 @@ namespace assignment_api
         {
             try
             {
-                SqlConnection conn = new SqlConnection(System.Configuration.ConfigurationManager.ConnectionStrings["DBConnectionString"].ConnectionString);
-                conn.Open();
-
-                string query = "INSERT INTO T_http_history(Input_String,Size,Output) VALUES(" + "\'"+ InputString + "\'" + "," + "\'" +Size + "\'"+ "," + "\'"+Output +"\'" + ")";
-                SqlCommand cmd = new SqlCommand(query, conn);
-                cmd.ExecuteNonQuery();
-
+                using (SqlConnection conn = new SqlConnection(connString))
+                {
+                    if (conn.State != ConnectionState.Open)
+                    {
+                        conn.Open();
+                    }
+                    conn.Open();
+                    string query = "INSERT INTO T_http_history(Input_String,Size,Output) VALUES(" + "\'" + InputString + "\'" + "," + "\'" + Size + "\'" + "," + "\'" + Output + "\'" + ")";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.ExecuteNonQuery();
+                    conn.Close();
+                    conn.Dispose();
+                }
                 return true;
             }
             catch (Exception ex)
@@ -65,6 +96,7 @@ namespace assignment_api
     }
     public class CountSubSet
     {
+        static string LogPath = AppKeyVaidation.ValidateAppKey("LogPath", "appSettings");
         /// <summary>
         /// This Mehod return the count of subset according to the size input.
         /// </summary>
@@ -95,19 +127,26 @@ namespace assignment_api
         /// This method return the list of history.
         /// </summary>
         /// <returns></returns>
-        public static List<History> GetHistory()
+        public static List<History> GetHistory(Filter _Filter)
         {
             DB objDB = new DB();
-            string StrErrMsg = String.Empty;
-            DataTable dtData = objDB.GetHistory(ref StrErrMsg);
-            List<History> _History = dtData.AsEnumerable().Select(row => 
-             new History
-                {
-                    Input_String = row.Field<string>("Input_String"),
-                    Size = row.Field<string>("Size"),
-                    Output = row.Field<string>("Output")
-                }).ToList();
-
+            List<History> _History = null;
+            try
+            {
+                string StrErrMsg = String.Empty;
+                DataTable dtData = objDB.GetHistory(ref StrErrMsg, _Filter);
+                _History = dtData.AsEnumerable().Select(row =>
+                 new History
+                 {
+                     Input_String = row.Field<string>("Input_String"),
+                     Size = row.Field<string>("Size"),
+                     Output = row.Field<string>("Output")
+                 }).ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.WritetoFile(LogPath, "Error in History : " + ex.Message + " at DateTime : " + DateTime.Now);
+            }
             return _History;
         }
     }

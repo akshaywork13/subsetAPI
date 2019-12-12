@@ -181,8 +181,12 @@
     </Compile>
     <Compile Include="Handler\ApiSecurity.cs" />
     <Compile Include="Handler\BasicAuthenticationAttribute.cs" />
+    <Compile Include="Logging\Logger.cs" />
     <Compile Include="Models\subset.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Validation\AppKeyVaidation.cs" />
+    <Compile Include="Validation\FilterValidation.cs" />
+    <Compile Include="Validation\RequestValidation.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />

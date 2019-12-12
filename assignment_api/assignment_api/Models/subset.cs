@@ -33,4 +33,9 @@ namespace assignment_api.Models
         public string Output { get; set; }
     }
 
+    public class Filter
+    {
+        public string Status { get; set; }
+        public string Date { get; set; }
+    }
 }
